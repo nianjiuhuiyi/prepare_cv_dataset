@@ -2,124 +2,106 @@ import time
 import os
 import shutil
 import json
-import numpy as np
-from sklearn.model_selection import train_test_split
 import glob
+from typing import Any
+
+from sklearn.model_selection import train_test_split
 from tqdm import tqdm
+
+import numpy as np
 np.random.seed(41)       # 为train_test_split设一个随机种子，保证每次运行都结果一致
 
 keys = dict(
-    开口扳手='0',
-    扭矩扳手正='1',
-    扭矩扳手反='2',
-    扭矩扳手带套筒='3',
-    套筒扳手正='4',
-    套筒扳手反='5',
-    套筒扳手带套筒='6',
-    分流导线='7',
-    平锉刀='8',
-    游标卡尺='9',
-    万用表='10',
-    套筒='11',
-    受电弓弓头='12',
-    手='13',
-    钳子='14',
-    螺丝刀='15',
-    手锤='16',
-    美工刀='17',
-    手锯='18',
-    卷尺='19',
-    钢直尺='20',
-    油漆笔='21',
-    导电膏='22',
-    碳滑条='23',
-    螺母='24',
-    螺栓='25',
-    万用表表笔='26'
+    扭矩扳手=0,
+    游标卡尺=1,
+    斜度塞尺=2
 )
 
 
-def load_json(part_json_list, name):
-    """
+class LABELME2YOLO:
+    def __init__(self, source_path: str, save_dir="datasets/coco/", if_test=False):
+        """
+        :param source_path: labelme标注结果的目录的路径，里面应包含了图片和其对应的json标注文件
+        :param save_dir: 这是针对yolov5的，默认就是这么放的，这个路径会影响生成的.txt标注文件
+        :param if_test: 是否启用测试集，一般数据少，不启用
+        :return:
+        """
+        self.labelme_path = source_path
+        self.if_test = if_test
 
-    :param part_json_list: 一个元素均为json文件名称的列表
-    :param name: 传入'train', 或者 'valid'这样的字符串,以生成train.txt或者valid.txt
-    :return:
-    """
-    train_label = open(f'{name}.txt', 'w')
-    for train_file in tqdm(part_json_list, f"{name}"):
-        with open(os.path.join(json_path, train_file), encoding='utf-8') as f:
-            data = json.load(f)
-        image_w = data['imageWidth']
-        image_h = data['imageHeight']
-        train_label.write("data/custom/images/{}.jpg\n".format(train_file.split('.')[0]))
+        self.save_dir = save_dir
+        self.imgs_dir = os.path.join(self.save_dir, "images")  # 总的图放的路径
+        self.labels_dir = os.path.join(self.save_dir, "labels")  # 总的txt的label放的路径
+        for path in [self.save_dir, self.imgs_dir, self.labels_dir]:
+            if not os.path.exists(path):
+                os.makedirs(path, exist_ok=True)
+        
+    def _load_json(self, part_json_list: list, name: str):
+        """
 
-        classes_list = data['shapes']  # a list（一个元素是一个物品）
-        label_txt = open(os.path.join('./labels', train_file.split('.')[0] + '.txt'), 'w')
-        for classes in classes_list:
-            label = classes['label']
-            points = np.array(classes['points'])
-            x1, y1 = min(points[:, 0]), min(points[:, 1])
-            x2, y2 = max(points[:, 0]), max(points[:, 1])
-            center_x, center_y = (x1 + x2) / 2, (y1 + y2) / 2
-            w, h = x2 - x1, y2 - y1
-            label_txt.write('{} {} {} {} {}\n'.format(
-                keys[label], center_x / image_w, center_y / image_h, w / image_w, h / image_h
-            ))  # （标签，归一化后的框的中心点坐标及其w,h）
-        label_txt.close()
-        train_label.flush()
-    train_label.close()
+        :param part_json_list: 一个元素均为json文件名称的列表
+        :param name: 传入'train', 或者 'val'这样的字符串,以生成train.txt或者val.txt
+        :return:
+        """
+        train_label = open(os.path.join(self.save_dir, f'{name}.txt'), 'w', encoding="utf-8")   # datasets/coco/train.txt
+        for train_file in tqdm(part_json_list, f"{name}"):
+            with open(os.path.join(self.labelme_path, train_file), encoding='utf-8') as f:
+                data = json.load(f)
+            image_w = data['imageWidth']
+            image_h = data['imageHeight']
+            # datasets/coco/images/00293.jpg  # 这是yolov5
+            # data/custom/images/00293.jpg   # 之前yolov3可能就是这种的
+            train_label.write("{}/{}.jpg\n".format(self.imgs_dir, train_file.split('.')[0]))
 
+            classes_list = data['shapes']  # a list（一个元素是一个物品）
+            label_txt = open(os.path.join(self.labels_dir, train_file.split('.')[0] + '.txt'), 'w', encoding="utf-8")
+            for classes in classes_list:
+                label = classes['label']
+                points = np.array(classes['points'])
+                x1, y1 = min(points[:, 0]), min(points[:, 1])
+                x2, y2 = max(points[:, 0]), max(points[:, 1])
+                center_x, center_y = (x1 + x2) / 2, (y1 + y2) / 2
+                w, h = x2 - x1, y2 - y1
+                label_txt.write('{} {} {} {} {}\n'.format(
+                    keys[label], center_x / image_w, center_y / image_h, w / image_w, h / image_h
+                ))  # （标签，归一化后的框的中心点坐标及其w,h）
+            label_txt.close()
+            train_label.flush()
+        train_label.close()
 
-def labelme2yolo(labelme_path):
-    """
-    将labelme得到的json文件转成此yolo需要的annotation文件
-    :param labelme_path: 所有labelme得到的标注文件的一个集合地址
-    :param test_sie: 验证集所占的比例
-    :return:
-    """
-    all_files = os.listdir(labelme_path)
-    label_files = [file for file in all_files if file.split('.')[-1] == 'json']  # 一个元素是一个json文件的名字
-    image_files = glob.glob(labelme_path + "/*.jpg")  # 列表，包含所有的图片，一个元素是一张图片的绝对地址
+    def __call__(self, test_size=0.1):
+        """
 
-    train_files, test_val_files = train_test_split(label_files, test_size=0.15)
-    test_files, val_files = train_test_split(test_val_files, test_size=0.15)
-    print("train_n:", len(train_files), 'test_n:', len(test_files), 'val_n:', len(val_files))
+        :param test_size: 验证集所占总数据集的比例
+        :return:
+        """
+        all_files = os.listdir(self.labelme_path)
+        label_files = [file for file in all_files if file.split('.')[-1] == 'json']  # 一个元素是一个json文件的名字
+        image_files = glob.glob(self.labelme_path + "/*.jpg")  # 列表，包含所有的图片，一个元素是一张图片的绝对地址
 
-    # "errors.txt是没有标注的json文件的名称，一般用不上，暂时先放这里，后面删除"
-    # with open("errors.txt") as f:
-    #     datas = f.readlines()
-    # print(datas)
-    # for data in datas:
-    #     data = data.replace('\n', '')
-    #     if data in train_files:
-    #         train_files.remove(data)
-    #     elif data in test_files:
-    #         test_files.remove(data)
-    #     else:
-    #         val_files.remove(data)
-    # print("train_n:", len(train_files), 'test_n:', len(test_files), 'val_n:', len(val_files))
+        if self.if_test:  # 如果要生成测试集
+            test_size += 0.05
+            train_files, test_val_files = train_test_split(label_files, test_size=test_size)
+            test_files, val_files = train_test_split(test_val_files, test_size=test_size)
+            print("train_n:", len(train_files), 'test_n:', len(test_files), 'val_n:', len(val_files))
+            self._load_json(part_json_list=test_files, name="test")
+        else:
+            train_files, val_files = train_test_split(label_files, test_size=test_size)
 
+        self._load_json(part_json_list=train_files, name="train")
+        self._load_json(part_json_list=val_files, name="val")
+        print("标签已经处理完毕！")
 
-    # 读取json文件的内容，并将每张图的坐标归一化其写到对应的./label/*.txt文件
-    load_json(train_files, 'train')
-    load_json(test_files, 'test')
-    load_json(val_files, 'valid')
-    print("标签已经处理完毕！")
-
-    # 将图片复制到对应的./images目录下；这里的格式是将所有的图片放到./images下，然后通过train.txt、valid.txt、test.txt去取
-    target_path = './images'
-    target_files = os.listdir(target_path)
-    for image_file_path in tqdm(image_files, "图像复制中"):
-        if os.path.split(image_file_path)[-1] in target_files:
-            continue
-        shutil.copy(image_file_path, target_path)
-    print("Everything is OK!")
-
+        # 将图片复制到对应的路径./images目录下；然后通过train.txt、val.txt、test.txt去取
+        for image_file_path in tqdm(image_files, "图像复制中"):
+            shutil.copy(image_file_path, self.imgs_dir)
+        print("Everything is OK!")
+        
 
 if __name__ == '__main__':
+    # 主要是针对yolov5的，其它可能有一点出入，具体就要看情况去进行修改了
     start_time = time.time()
-    json_path = r"./data_two_fuse"
-    labelme2yolo(json_path)
+    file_path = r"./all"         # 路径下应该是所有的图片和labelme标注的json文件
+    LABELME2YOLO(source_path=file_path)()
     end_time = time.time()
     print("总用时:{:.2f}分钟".format((end_time - start_time) / 60))
