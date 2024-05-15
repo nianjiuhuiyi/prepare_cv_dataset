@@ -10,3 +10,4 @@
 2. [merge_json.py](./merge_json.py)：把两个同标注类别，图片是前后顺序的json标注文件融合到一起。
 3. [labelme2yolov8Pose.py](./labelme2yolov8Pose.py)：将labelme标注的关键点格式转成yolov8关键点的数据格式。
 4. [grab_image.py](./grab_image.py)：多/单路相机同时进行采图。
+5. [contour_matting.py](./contour_matting.py)：把目标沿其轮廓或是最小外接矩形从原图中抠出来，并贴到一个纯黑或纯白的背景中。
