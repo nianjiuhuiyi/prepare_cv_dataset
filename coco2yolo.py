@@ -61,6 +61,7 @@ import numpy as np
 
 np.random.seed(41)
 
+# 这里的keys是放这里方便看的，没有用到。
 keys = dict(
     套筒="T00",
     扭矩扳手="T01",
@@ -77,9 +78,13 @@ keys = dict(
 
 
 class COCO2YOLO:
-    def __init__(self, coco_json_path):
+    def __init__(self, coco_json_path, save_path=r"./datasets/coco"):
         with open(coco_json_path, mode='r', encoding="utf-8") as fp:
             self.json_data = json.load(fp)
+
+        self.save_path = save_path
+        if not os.path.exists(self.save_path):
+            os.makedirs(self.save_path)
 
         self.categories = self._get_categories()
         self.images_info = self._get_images_info()
@@ -179,7 +184,7 @@ class COCO2YOLO:
             # 会有分割区域是多个部分的，即 segmentation 是 [[]] ，大多数情况 len(segmentation) = 1,所以以前常直接segmentation[0]
             # 现在不为区域个数不为1时就要合并，方法是来自yolov5的官方：https://github.com/ultralytics/JSON2YOLO/blob/c38a43f342428849c75c103c6d060012a83b5392/general_json2yolo.py#L295
             if len(segmentation) > 1:
-                # 合并的方法辣子鱼
+                # 合并的方法
                 segmentation = self._merge_multi_segment(segmentation)
                 segmentation = np.concatenate(segmentation, axis=0).reshape(-1).tolist()
             else:
@@ -196,31 +201,33 @@ class COCO2YOLO:
         :param type_name: 传入'train', 或者 'valid'这样的字符串,以生成train.txt或者valid.txt
         :return:
         """
-        if not os.path.exists("datasets/coco/labels/"):
-            os.makedirs("datasets/coco/labels/")
+        labels_path = os.path.join(self.save_path, "labels")   # like this "datasets/coco/labels/"
+        if not os.path.exists(labels_path):
+            os.makedirs(labels_path)
 
         # 总的例如“train.txt”是用来存放所有训练集的图片路径，一行记录一张图片的路径
-        total_label = open(f"datasets/coco/{type_name}.txt", mode='w', encoding="utf-8")
+        total_label = open(f"{self.save_path}/{type_name}.txt", mode='w', encoding="utf-8")
 
         for val_file in tqdm(part_name_list, desc=f"{type_name}: "):
             file_name, img_w, img_h = self.images_info.get(val_file)
-            total_label.write("datasets/coco/images/{}\n".format(file_name))
+            total_label.write("{}/images/{}\n".format(self.save_path, file_name))
             total_label.flush()
 
             # if no objects in image, no *.txt file is required
-            # 看到yolo官方的处理中，会把没有目标的图给删除，我在想是不是也删掉
+            # 看到yolo官方的处理中，会把没有目标的图给删除，我在想是不是也删掉(不删，在yolov5中就默认是背景图)
             annotations = self.annotations.get(val_file)
             if not annotations:
                 continue
 
-            save_label_path = os.path.join("datasets/coco/labels/", file_name.split('.')[0] + ".txt")
+            save_label_path = os.path.join(labels_path, file_name.split('.')[0] + ".txt")
             label_txt = open(save_label_path, mode='w', encoding="utf-8")
 
             if use_segment:
                 for annotation in annotations:
                     category_id, _, segmentation = annotation
                     # 坐标归一化
-                    segmentation = (np.array(segmentation).reshape(-1, 2) / np.array([img_w, img_h])).reshape(-1).tolist()
+                    segmentation = (np.array(segmentation).reshape(-1, 2) / np.array([img_w, img_h])).reshape(
+                        -1).tolist()
                     label_txt.write("{} {}\n".format(category_id, ' '.join(map(str, segmentation))))
                     label_txt.flush()
             else:
@@ -232,7 +239,7 @@ class COCO2YOLO:
 
                     label_txt.write("{} {} {} {} {}\n".format(
                         category_id, center_x / img_w, center_y / img_h, w / img_w, h / img_h
-                    ))    # box中心点坐标、box的宽高
+                    ))  # box中心点坐标、box的宽高
                     label_txt.flush()
             label_txt.close()
         total_label.close()
@@ -241,7 +248,7 @@ class COCO2YOLO:
         """
         默认仅生成训练集和验证集，不做测试集。
         :param train_size: 训练集所占比重（0-1）
-        :param use_segment: 默认为False,即生成的数据是box的框检测，为True就是申城的数据是分割的
+        :param use_segment: 默认为False,即生成的数据是box的框检测，为True就是生成的数据是分割的
         :return:
         """
         # 得到的是对应类别的images_info的key，它就是annotations中的"image_id"，也是images中的“id”
@@ -251,6 +258,7 @@ class COCO2YOLO:
 
 
 if __name__ == '__main__':
-    obj = COCO2YOLO(r"./annotations.json")
+    # 下面保存路径结尾千万能带/符号，即绝不能是./datasets/coco/
+    obj = COCO2YOLO(r"./annotations.json", save_path="./datasets/coco")
     # 修改 use_segment 的值来生成目标检测还是分割的标签
-    obj.run(train_size=0.9, use_segment=True)
+    obj.run(train_size=0.9, use_segment=False)   # 这很重要
