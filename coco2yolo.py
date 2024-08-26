@@ -1,3 +1,6 @@
+#!/usr/bin/env /root/anaconda3/bin/python
+# linux下，可以像这样添加python的执行路径，然后给文件夹添加上执行权限，就能直接执行了
+
 """
     最终转换格式为YOLOV5中的参考：https://docs.ultralytics.com/yolov5/tutorials/train_custom_data/#11-create-datasetyaml
     理论上YOLO的格式都是这样差不多。
@@ -258,7 +261,16 @@ class COCO2YOLO:
 
 
 if __name__ == '__main__':
-    # 下面保存路径结尾千万能带/符号，即绝不能是./datasets/coco/
-    obj = COCO2YOLO(r"./annotations.json", save_path="./datasets/coco")
-    # 修改 use_segment 的值来生成目标检测还是分割的标签
-    obj.run(train_size=0.9, use_segment=False)   # 这很重要
+
+    # 同时生成 det、seg 的标签。
+    flag = False
+    for save_path in ["datasets/coco/det", "datasets/coco/seg"]:
+        if save_path.endswith("seg"):
+            flag = True    
+
+        # 下面保存路径结尾千万能带/符号，即绝不能是datasets/coco/
+        # 也绝对不能是 ./datasets/coco 这样写，这样写后，yolov5训练时拼接出来的地址不对，会找不到图片路径
+        obj = COCO2YOLO(r"./annotations.json", save_path=save_path)
+        # 修改 use_segment 的值来生成目标检测还是分割的标签
+        obj.run(train_size=0.9, use_segment=flag)
+
