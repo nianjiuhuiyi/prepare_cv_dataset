@@ -33,5 +33,37 @@
   print(','.join(categories))
   ```
 
+- 针对win批量改名后图片再次进行批量重命名：（先按照前面字母排序，字母一样的时候就会按照括号里的数字大小排序）
+
+  ```python
+  import glob
+  import os
   
+  # 传进来的win批量命名的图片名称，如 "a (1).jpg"
+  def my_sort(x: str):
+      x = x.split(' ')  #  ['a', '(1).jpg'] 
+      first = x[0]
+      second = x[1].split('.')[0]     # (1)  (10)  (11)  之类的结果
+      second = second.strip('(').strip(')')   # 1  10  11  之类的string
+      return (first, int(second))   # 记得要把是string类型的数字转成int
+  
+  begin_num = 123
+  
+  imgs_name = glob.glob("*.jpg")
+  imgs_name.sort(key=my_sort)
+  print(imgs_name)
+  for img_name in imgs_name:
+      os.rename(img_name, f"{begin_num:05d}.jpg")
+      begin_num += 1
+  print("Done!")
+  ```
+
+  说明：
+  
+  - 单纯的imgs_name.sort()，就会得到类似这样的结果：
+    ['a (1).jpg', 'a (10).jpg', 'a (11).jpg', , 'a (2).jpg', 'a (20).jpg', 'a (21).jpg',  'a (3).jpg', 'a (4).jpg', 'a (5).jpg', 'a (6).jpg', 'a (7).jpg', 'a (8).jpg', 'a (9).jpg', 'b (1).jpg', 'b (10).jpg', 'b (11).jpg', 'b (2).jpg', 'b (3).jpg']
+  - imgs_name.sort(key=len)，就会得到类似这样的效果：
+    ['a (1).jpg', 'a (2).jpg', 'a (9).jpg', 'b (1).jpg', 'b (2).jpg', 'b (9).jpg', 'c (1).jpg', 'c (2).jpg', 'c (9).jpg', 'a (10).jpg', 'a (11).jpg', 'b (10).jpg', 'b (11).jpg', 'b (12).jpg', 'c (10).jpg', 'c (11).jpg', 'c (12).jpg']
+  - 通过上面按两个字段自定义排序后，就会得到想要的效果：（即先按前面字母排序，字母相同时再按后面括号里数字排序）
+    ['a (1).jpg', 'a (2).jpg', 'a (9).jpg', 'a (10).jpg', 'a (11).jpg', 'b (1).jpg', 'b (2).jpg', 'b (9).jpg', 'b (10).jpg', 'b (11).jpg', 'b (12).jpg', 'c (1).jpg', 'c (2).jpg', 'c (9).jpg', 'c (10).jpg', 'c (11).jpg', 'c (12).jpg']
 
