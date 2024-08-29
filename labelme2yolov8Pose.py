@@ -34,6 +34,57 @@
     └── val.txt
 """
 
+"""
+# 在用下面脚本之前，可能存在，比如游标卡尺因为太大，无法自动标注(SAM-tools对这种标出来有问题)，使用边缘轮廓查找，用代码获取它的最小外接矩形
+# 先用labelme把游标卡尺的关键点标出来，然后再用这里的这段代码去找到框，并把框的坐标更新到关键点的json文件中。然后再用这最终结果去转换成yolov8Pose要的数据
+
+import cv2
+import glob
+import json
+import numpy as np
+
+imgs_name = glob.glob("./images/*.jpg")
+imgs_name.sort()
+jsons_name = glob.glob("./images/*.json")
+jsons_name.sort()
+
+for i in range(len(imgs_name)):
+    img_name = imgs_name[i]
+    json_name = jsons_name[i]
+    with open(json_name, encoding="utf-8") as fp:
+        json_data = json.load(fp)
+    
+    img = cv2.imread(img_name)
+    img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    img_gauss = cv2.GaussianBlur(img_gray, (15, 15), 0)
+    img_canny = cv2.Canny(img_gauss, 50, 150)
+
+    contours, _hierarchy = cv2.findContours(img_canny, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE) 
+    points = np.vstack(contours)
+    points = np.squeeze(points)
+
+    x1y1 = np.min(points, axis=0)
+    x2y2 = np.max(points, axis=0)
+
+    json_data["shapes"].append(dict(
+        label="ruler",
+        points=[x1y1.tolist(), x2y2.tolist()],
+        group_id=None,
+        description='',
+        shape_type="rectangle",
+        flags={}
+    ))
+
+    with open(json_name, "w", encoding="utf-8") as fp:
+        json.dump(json_data, fp)
+
+    # cv2.rectangle(img, x1y1, x2y2, (0, 0, 255), 3)
+    # img = cv2.resize(img, (512, 512))
+    # cv2.imshow("1", img)
+    # cv2.waitKey(0)
+
+"""
+
 import time
 import os
 import shutil
