@@ -1,10 +1,19 @@
 
 """
-    此程序默认是将 dir_path 路径中的的所有文件夹(如01、02、03、...)中的annotations合并成一个annotations.json
-    也可单独把merge函数拿出来，用来合并两个annotations.json为一个annotations.json
+此程序是将多个分文件夹标注的annotations.json合并成一个annotations.json
+使用：
+    方式一： 将程序放在 dataset 文件夹里，dataset文件夹里有其他数字命名的文件夹，如01、02、03、...
+        如：python merge_json.py
+    
+    方式二：脚本文件随便放，dataset 的路径传递过去
+        如：python merge_json.py I:\SAM-workTable-0815\dataset
+
+    
+    当然也可单独把merge函数拿出来，简单合并两个annotations.json为一个annotations.json
 """
 
 import os
+import sys
 import json
 from datetime import datetime
 
@@ -67,18 +76,32 @@ def merge(before_json_path: str, after_json_path: str, result_path = r"./annotat
     print("Done!")
 
 
-if __name__ == '__main__':
+def main():
+    # 默认脚本文件是在 ./dataset 这个当前路径下执行
+    dir_path = os.path.dirname(os.path.abspath(__file__))
+    # 也可以将路径传进来， 比如： python merge_json.py "I:\SAM-workTable-0815\dataset"
+    if (len(sys.argv)) == 2:
+        if os.path.isdir(sys.argv[1]):
+            dir_path = sys.argv[1]
+        else:
+            print(f"指定的路径: {dir_path} 不存在，请检查.")
+            exit(1)
+    elif (len(sys.argv)) > 2:
+        print("参数传入错误，请将脚本放放置在 dataset 所在路径运行.\n或传入指定路径，如：python merge_json.py I:\SAM-workTable-0815\dataset")
+        exit(1)
 
-    dir_path = r"I:\SAM-workTable-0815\dataset"
-    files = os.listdir(dir_path)
-    print(files)
+    dir_names = os.listdir(dir_path)
+    dir_names = [dir_name for dir_name in os.listdir(dir_path) if os.path.isdir(os.path.join(dir_path, dir_name))]
     # files = sorted(files, key=lambda x: int(x))
-    files.sort(key=lambda x: int(x))
-    print(files)
+    dir_names.sort(key=lambda x: int(x))
+    print(dir_names)
 
     all_json_path = []
-    for file in files:
-        json_path = os.path.join(dir_path, file, "annotations.json")
+    for dir_name in dir_names:
+        json_path = os.path.join(dir_path, dir_name, "annotations.json")
+        if not os.path.exists(json_path):
+            print(f"此json文件不存在，请检查：{json_path}")
+            exit(1)
         all_json_path.append(json_path)
     
     print(all_json_path)
@@ -90,5 +113,9 @@ if __name__ == '__main__':
     for i in range(2, len(all_json_path)):
         merge(result, all_json_path[i], result)
 
-    print("Done!")
+    print("All Done!")
+
+
+if __name__ == '__main__':
+    main()
     
