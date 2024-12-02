@@ -12,6 +12,7 @@
    - [counts.py](./counts.py)：统计一个annotations.json文件里所有的类别，及其对应的每个类别的数量
 3. [labelme2yolov8Pose.py](./labelme2yolov8Pose.py)：将labelme标注的关键点格式转成yolov8关键点的数据格式。
 4. [grab_image.py](./grab_image.py)：多/单路相机同时进行采图。
+   - [video2frame.py](./video2frame.py)：将视频抽帧成图片。
 5. [contour_matting.py](./contour_matting.py)：把目标沿其轮廓或是最小外接矩形从原图中抠出来，并贴到一个纯黑或纯白的背景中。
 
 ---
